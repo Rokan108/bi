@@ -133,3 +133,65 @@ if 'Salary' in df.columns:
 if 'Age' in df.columns:
     print(f"\nYoungest Person's Age: {df['Age'].min()}")
     print(f"Oldest Person's Age: {df['Age'].max()}")
+
+_____________________________________________________________________________________________________________________________________________________________
+==================================MY SQL CODE======================================
+
+-- Disable safe update mode
+SET SQL_SAFE_UPDATES = 0;
+
+CREATE DATABASE IF NOT EXISTS Sales_Staging;
+USE Sales_Staging;
+
+CREATE TABLE IF NOT EXISTS Staging_Sales (
+    SalesID      INT PRIMARY KEY,
+    OrderDate    DATE,
+    ProductName  VARCHAR(100),
+    Category     VARCHAR(50),
+    Region       VARCHAR(50),
+    SalesAmount  DECIMAL(10,2),
+    Profit       DECIMAL(10,2),
+    Quantity     INT,
+    LoadDate     DATETIME DEFAULT CURRENT_TIMESTAMP,
+    BatchID      INT
+);
+
+CREATE TABLE IF NOT EXISTS Final_Sales (
+    SalesID      INT PRIMARY KEY,
+    OrderDate    DATE,
+    ProductName  VARCHAR(100),
+    Category     VARCHAR(50),
+    Region       VARCHAR(50),
+    SalesAmount  DECIMAL(10,2),
+    Profit       DECIMAL(10,2),
+    Quantity     INT,
+    LoadDate     DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO Staging_Sales (SalesID, OrderDate, ProductName, Category, Region, SalesAmount, Profit, Quantity, BatchID)
+VALUES
+    (1, '2024-01-01', 'Laptop',     'Electronics', 'North', 1200.00, 200.00, 3, 101),
+    (2, '2024-01-02', 'Smartphone', 'Electronics', 'South',  800.00, 150.00, 2, 101),
+    (3, '2024-01-03', 'Tablet',     'Electronics', 'East',   600.00, 100.00, 5, 101);
+
+DELETE FROM Staging_Sales
+WHERE SalesID NOT IN (
+    SELECT SalesID FROM (
+        SELECT MIN(SalesID) AS SalesID
+        FROM Staging_Sales
+        GROUP BY OrderDate, ProductName, Region
+    ) AS deduped
+);
+
+-- Fix 2: Update NULL profits (safe update mode disabled above fixes Error 1175)
+UPDATE Staging_Sales
+SET Profit = 0
+WHERE Profit IS NULL;
+
+INSERT INTO Final_Sales (SalesID, OrderDate, ProductName, Category, Region, SalesAmount, Profit, Quantity)
+SELECT SalesID, OrderDate, ProductName, Category, Region, SalesAmount, Profit, Quantity
+FROM Staging_Sales;
+
+DELETE FROM Staging_Sales WHERE BatchID = 101;
+
+SET SQL_SAFE_UPDATES = 1;
